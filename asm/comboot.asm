@@ -4,6 +4,7 @@
 ;Store boot drive
 mov [boot_drive], dl
 
+call cls
 mov si, mesg_greeting
 call puts
 
