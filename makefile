@@ -1,5 +1,7 @@
 all: clean force
-	cd asm && nasm comboot.asm -o ../bin/comboot.bin
+	cd asm && nasm bootsec.asm -o ../bin/000-bootsec.bin
+	cd asm && nasm comboot.asm -o ../bin/001-comboot.bin
+	cat bin/*.bin | sponge > bin/comboot.bin
 
 force:
 	-mkdir bin
