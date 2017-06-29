@@ -3,6 +3,39 @@ disk_n_h equ 2				;Heads per cylinder
 disk_err_threshold equ 5	;Error threshold
 
 ;Reads data from disk
+;al - sector count
+;es:bx - data address
+;cl - sector number
+;ch - cylinder number
+;dl - drive number
+;dh - head number
+;es:bx - data addresses
+diskrchs:
+	pushf
+	pusha
+	diskrchs_l:
+		popa
+		pusha
+		mov ah, 0					;Reset disk
+		int 0x13					;
+		mov ah, 0x2 				;Sector read
+		int 0x13					;Disk interrupt
+		jnc diskrchs_end			;If carry flag is not set (no error, quit)
+		mov cx, [diskrchs_cnt]		;Increment error counter
+		inc cx						;
+		mov [diskrchs_cnt], cx		;
+		cmp cx, disk_err_threshold	;Check if error count is below threshold
+		jle diskrchs_l				;If so, try again
+		call diskerr				;Else, call disk error handler
+	diskrchs_end:					;
+	mov cx, 0						;Clear error counter
+	mov [diskrchs_cnt], cx			;
+	popa
+	popf
+	ret
+	diskrchs_cnt: dw 0				;Disk error counter
+
+;Reads data from disk
 ;ax - LBA
 ;dl - drive number
 ;dh - sector count
@@ -26,28 +59,47 @@ diskrlba:
 	mov cl, [diskrlba_s]			;Load CHS
 	mov ch, [diskrlba_c]			;
 	mov dh, [diskrlba_h]			;
-	diskrlba_l:						;
-		mov ah, 0					;Reset disk
-		int 0x13					;
-		mov ah, 0x2 				;Sector read
-		int 0x13					;Disk interrupt
-		jnc diskrlba_end			;If carry flag is not set (no error, quit)
-		mov cx, [diskrlba_cnt]		;Increment error counter
-		inc cx						;
-		mov [diskrlba_cnt], cx		;
-		cmp cx, disk_err_threshold	;Check if error count is below threshold
-		jle diskrlba_l				;If so, try again
-		call diskerr				;Else, call disk error handler
-	diskrlba_end:					;
-	mov cx, 0						;Clear error counter
-	mov [diskrlba_cnt], cx			;
+	call diskrchs
 	popa
 	popf
 	ret
-	diskrlba_cnt: dw 0			;Disk error counter
 	diskrlba_s: dw 0			;Sector number
 	diskrlba_h: dw 0			;Head number
 	diskrlba_c: dw 0			;Cylinder number
+
+;Writes data to disk
+;al - sector count
+;es:bx - data address
+;cl - sector number
+;ch - cylinder number
+;dl - drive number
+;dh - head number
+;es:bx - data addresses
+diskwchs:
+	pushf
+	pusha
+	diskwchs_l:
+		popa
+		pusha
+		mov ah, 0					;Reset disk
+		int 0x13					;
+		mov ah, 0x3 				;Sector write
+		int 0x13					;Disk interrupt
+		jnc diskwchs_end			;If carry flag is not set (no error, quit)
+		mov cx, [diskwchs_cnt]		;Increment error counter
+		inc cx						;
+		mov [diskwchs_cnt], cx		;
+		cmp cx, disk_err_threshold	;Check if error count is below threshold
+		jle diskwchs_l				;If so, try again
+		call diskerr				;Else, call disk error handler
+	diskwchs_end:					;
+	mov cx, 0						;Clear error counter
+	mov [diskwchs_cnt], cx			;
+	popa
+	popf
+	ret
+	diskwchs_cnt: dw 0				;Disk error counter
+
 
 ;Writes data to disk
 ;ax - LBA
@@ -73,25 +125,10 @@ diskwlba:
 	mov cl, [diskwlba_s]			;Load CHS
 	mov ch, [diskwlba_c]			;
 	mov dh, [diskwlba_h]			;
-	diskwlba_l:						;
-		mov ah, 0					;Reset disk
-		int 0x13					;
-		mov ah, 0x3 				;Sector write
-		int 0x13					;Disk interrupt
-		jnc diskwlba_end			;If carry flag is not set (no error, quit)
-		mov cx, [diskwlba_cnt]		;Increment error counter
-		inc cx						;
-		mov [diskwlba_cnt], cx		;
-		cmp cx, disk_err_threshold	;Check if error count is below threshold
-		jle diskwlba_l				;If so, try again
-		call diskerr				;Else, call disk error handler
-	diskwlba_end:					;
-	mov cx, 0						;Clear error counter
-	mov [diskwlba_cnt], cx			;
+	call diskwchs
 	popa
 	popf
 	ret
-	diskwlba_cnt: dw 0			;Disk error counter
 	diskwlba_s: dw 0			;Sector number
 	diskwlba_h: dw 0			;Head number
 	diskwlba_c: dw 0			;Cylinder number
