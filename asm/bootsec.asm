@@ -58,7 +58,7 @@ mesg_diskload_fail:
 	db "aborting...", 10, 13
 	db 0
 mesg_greeting:
-	db "comboot v0.1", 10, 13
+	db "---comboot bootloader v0.1", 10, 13
 	db 0
 mesg_success:
 	db "success...", 10, 13
