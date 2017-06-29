@@ -57,7 +57,7 @@ getc:
 	getc_key: dw 0
 
 ;Fetch keystroke (wait)
-;return al - 1 if keyboard buffer is not empty
+;return al - 0 if keyboard buffer is empty
 kbhit:
 	pushf
 	pusha
