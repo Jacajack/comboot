@@ -13,11 +13,15 @@ disk_err_threshold equ 5	;Error threshold
 diskrchs:
 	pushf
 	pusha
-	diskrchs_l:
+	jmp diskrchs_start
+	diskrchs_reset:
 		popa
 		pusha
 		mov ah, 0					;Reset disk
 		int 0x13					;
+	diskrchs_start:
+		popa						;In case disk reset modified registers
+		pusha						;
 		mov ah, 0x2 				;Sector read
 		int 0x13					;Disk interrupt
 		jnc diskrchs_end			;If carry flag is not set (no error, quit)
@@ -25,7 +29,7 @@ diskrchs:
 		inc cx						;
 		mov [diskrchs_cnt], cx		;
 		cmp cx, disk_err_threshold	;Check if error count is below threshold
-		jle diskrchs_l				;If so, try again
+		jle diskrchs_reset			;If so, try again
 		call diskerr				;Else, call disk error handler
 	diskrchs_end:					;
 	mov cx, 0						;Clear error counter
@@ -78,11 +82,15 @@ diskrlba:
 diskwchs:
 	pushf
 	pusha
-	diskwchs_l:
+	jmp diskwchs_start
+	diskwchs_reset:
 		popa
 		pusha
 		mov ah, 0					;Reset disk
 		int 0x13					;
+	diskwchs_start:
+		popa						;In case disk reset modified registers
+		pusha						;
 		mov ah, 0x3 				;Sector write
 		int 0x13					;Disk interrupt
 		jnc diskwchs_end			;If carry flag is not set (no error, quit)
@@ -90,7 +98,7 @@ diskwchs:
 		inc cx						;
 		mov [diskwchs_cnt], cx		;
 		cmp cx, disk_err_threshold	;Check if error count is below threshold
-		jle diskwchs_l				;If so, try again
+		jle diskwchs_reset			;If so, try again
 		call diskerr				;Else, call disk error handler
 	diskwchs_end:					;
 	mov cx, 0						;Clear error counter
