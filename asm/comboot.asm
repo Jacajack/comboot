@@ -2,6 +2,8 @@
 [org 0x500]
 
 pop dx
+mov ax, dx
+call puthexw
 mov [boot_drive], dl
 
 ;Display greeting message
@@ -22,7 +24,7 @@ mov si, mesg_newfloppy
 call puts
 
 ;Wait for keypress
-;call getc
+call getc
 
 ;Init serial port
 mov ax, 0x3f8
@@ -35,17 +37,49 @@ call comclibuf
 mov si, mesg_recv
 call puts
 
-mov ax, 0x0000
+;mov al, [boot_drive]
+;call puthexb
+
+
+mov ax, teststas
 mov es, ax
-mov ax, 0x0001
-
-mov bx, 0x0
+mov ax, teststao
+mov bx, testends
 mov fs, bx
-mov bx, 0x000f
+mov bx, testendo
+pusha
 
-mov dx, 0x0010
 
+recv:
+call kbhit
+cmp al, 0
+je nokey
+call getc
+cmp al, 'f'
+jne nokey
+
+jmp gaga
+
+nokey:
+call comckin
+cmp al, 0
+je recv
+call comrecv
+mov [temp], al
+
+popa
+mov cl, [temp]
+push bx
+mov bx, ax
+mov [es:bx], cl
+pop bx
+mov dx, 001
 call memcrawl
+cmp cl, 0
+jne gaga
+pusha
+
+pusha
 mov bx, ax
 mov ax, es
 call puthexw
@@ -53,85 +87,93 @@ mov al, ':'
 call putc
 mov ax, bx
 call puthexw
+mov al, `\r`
+call putc
+popa
+
+jmp recv
+
+gaga:
+mov si, mesg_eor
+call puts
+call getc
+gigi:
+
+
+mov si, mesg_nl
+call puts
+
+;mov si, mesg_ok
+;call puts
+
+mov ax, teststas
+mov es, ax
+mov ax, teststao
+mov cx, 0
+
+
+wloop:
+	push ax
+	push es
+
+	mov ax, teststas
+	mov es, ax
+	mov bx, teststao
+
+	mov ax, [seccnt]
+	mov dl, [boot_drive]
+	mov dh, 1
+	call diskwlba
+	inc ax
+	mov [seccnt], ax
+	pop es
+	pop ax
+
+	mov dx, 512
+	mov bx, testends
+	mov fs, bx
+	mov bx, testendo
+	call memcrawl
+	cmp cl, 0
+	je contwloop
+	jmp wloop_end
+	contwloop:
+
+	pusha
+	push ds
+	push es
+
+	mov bx, es
+	mov ds, bx
+	mov si, ax
+
+	mov bx, teststas
+	mov es, bx
+	mov di, teststao
+	mov cx, 512
+
+	call memcpy
+	pop es
+	pop ds
+	popa
+
+	jmp wloop
+
+
+wloop_end:
+mov si, mesg_ok
+call puts
+
+teststas equ 0x0000
+testends equ teststas+(1024*100/16)
+teststao equ 0x0b00
+testendo equ teststao
 
 jmp $
 
-;es:ax - current address
-;fs:bx - end address
-;dx - offset
-;return es:ax - new address
-;return cl - crawl performed (0 - ok)
-memcrawl:
-	pushf
-	pusha
-	push dx					;
-							;Calculate real address of given pointer
-	mov dx, es				;Load segment into dx
-	shr dh, 4				;Get oldest 4 bits of segment number
-	mov cl, dh				;Store them in cl
-	mov dx, es				;Load es into dx again
-	shl dx, 4				;Shift segment register 4 bytes to the left
-	add ax, dx				;Add it to offset
-	adc cl, 0				;Increment oldest address byte depending on carry flag
-	mov [memcrawl_c+2], cl	;Update values in memory
-	mov [memcrawl_c], ax	;
-							;Calculate real address of end pointer
-	mov dx, fs				;Load segment into dx
-	shr dh, 4				;Get oldest 4 bits of segment number
-	mov ch, dh				;Store them in ch
-	mov dx, fs				;Load es into dx again
-	shl dx, 4				;Shift segment register 4 bytes to the left
-	add bx, dx				;Add it to offset
-	adc ch, 0				;Increment oldest address byte depending on carry flag
-	mov [memcrawl_e+2], ch	;Update values in memory
-	mov [memcrawl_e], bx	;
-	sub bx, ax				;Substract both pointers to calculate maximum allowed jump
-	sbb ch, cl				;
-	pop dx					;Get step size
-	mov cl, 1				;Assume crawl to be failed
-	mov [memcrawl_bnd], cl	;
-	mov cl, [memcrawl_c+2]	;Get original pointer from memory
-	mov ax, [memcrawl_c]	;
-	cmp ch, 0				;Compare requested step with distance to end pointer
-	jne memcrawl_jok		;
-	cmp dx, bx				;
-	jb memcrawl_jok			;
-	mov bx, 0				;If pointer cannot be incremented
-	mov ch, 0				;
-	jmp memcrawl_jbad		;
-	memcrawl_jok:			;Increment pointer
-	mov ch, 0				;Crawl successfull
-	mov [memcrawl_bnd], ch	;
-	add ax, dx				;Add jump value with carry
-	adc cl, 0				;
-	memcrawl_jbad:			;Pointer cannot be incremented
-	mov bx, 0				;Copy 4 oldest address bits
-	shl cl, 4				;To highest bits of segment register
-	mov bh, cl				;
-	mov dx, ax				;Get 4 youngest bits of real address as offset
-	and dx, 0xF				;
-	shr ax, 4				;Shift the rest 4 bits to the right and add it to segment register
-	add bx, ax				;
-	jnc memcrawl_nocarry	;If no carry flag is set - exit
-	shl bx, 4				;Shift segment register 4 bits to the left
-	add dx, bx				;Add it to offset register
-	mov bx, 0xffff			;Fill segment register with highest value possible
-	memcrawl_nocarry:		;
-	mov [memcrawl_seg], bx	;Store segment
-	mov [memcrawl_off], dx	;Store offset
-	popa					;
-	mov ax, [memcrawl_seg]	;Restore all values that should be retuned from memory
-	mov es, ax				;
-	mov ax, [memcrawl_off]	;
-	mov cl, [memcrawl_bnd]	;
-	popf
-	ret
-	memcrawl_c: times 3 db 0
-	memcrawl_e: times 3 db 0
-	memcrawl_seg: dw 0
-	memcrawl_off: dw 0
-	memcrawl_bnd: db 0
+seccnt: dw 0
 
+temp: db 0
 
 
 boot_drive: db 0
@@ -160,8 +202,17 @@ mesg_ok:
 	db "ok...", 10, 13
 	db 0
 
+mesg_loop:
+	db "loop...", 10, 13
+	db 0
+
+mesg_eor:
+	db "end of read. press any key", 10, 13
+	db 0
+
 mesg_nl: db 10, 13, 0
 
 %include "stdio.asm"
 %include "com.asm"
 %include "disk.asm"
+%include "mem.asm"
