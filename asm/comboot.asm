@@ -82,7 +82,7 @@ pusha
 
 pusha
 mov al, [newchar]
-call putc
+call puthexb
 mov al, `\r`
 call putc
 popa
