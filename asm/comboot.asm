@@ -65,6 +65,7 @@ call comckin
 cmp al, 0
 je recv
 call comrecv
+mov [newchar], al
 mov [temp], al
 
 popa
@@ -80,13 +81,8 @@ jne gaga
 pusha
 
 pusha
-mov bx, ax
-mov ax, es
-call puthexw
-mov al, ':'
+mov al, [newchar]
 call putc
-mov ax, bx
-call puthexw
 mov al, `\r`
 call putc
 popa
@@ -126,6 +122,11 @@ wloop:
 	call diskwlba
 	inc ax
 	mov [seccnt], ax
+	call puthexw
+	push ax
+	mov al, `\r`
+	call putc
+	pop ax
 	pop es
 	pop ax
 
@@ -175,12 +176,12 @@ seccnt: dw 0
 
 temp: db 0
 
-
+newchar: db 0
 boot_drive: db 0
 
 ;Messages collection
 mesg_greeting:
-	db "---comboot v0.2", 10, 13
+	db "---comboot v0.3 testing", 10, 13
 	db 0
 
 mesg_mem:
@@ -191,7 +192,7 @@ mesg_mem2:
 	db 0
 
 mesg_newfloppy:
-	db "please insert new flopyy disk and press any key afterwards...", 10, 13
+	db "please insert new floppy disk and press any key afterwards...", 10, 13
 	db 0
 
 mesg_recv:
