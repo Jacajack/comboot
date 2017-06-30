@@ -141,6 +141,17 @@ diskwlba:
 	diskwlba_h: dw 0			;Head number
 	diskwlba_c: dw 0			;Cylinder number
 
+;Resets chosen disk
+;dl - drive number
+diskreset:
+	pushf
+	pusha
+	mov ah, 0 						;Reset disk
+	int 0x13						;BIOS drive interrupt
+	popa
+	popf
+	ret
+
 ;Disk error handler
 diskerr:
 	pushf
