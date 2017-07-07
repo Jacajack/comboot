@@ -37,10 +37,11 @@ call comclibuf
 mov si, mesg_recv
 call puts
 
-;mov al, [boot_drive]
-;call puthexb
-
-
+;Settings for memcrawl
+teststas equ 0x0000
+testends equ teststas+(1024*100/16)
+teststao equ 0x0b00
+testendo equ teststao
 mov ax, teststas
 mov es, ax
 mov ax, teststao
@@ -49,139 +50,116 @@ mov fs, bx
 mov bx, testendo
 pusha
 
-
+;Reception part
 recv:
-call kbhit
-cmp al, 0
-je nokey
-call getc
-cmp al, 'f'
-jne nokey
-
-jmp gaga
-
-nokey:
-call comckin
-cmp al, 0
-je recv
-call comrecv
-mov [newchar], al
-mov [temp], al
-
-popa
-mov cl, [temp]
-push bx
-mov bx, ax
-mov [es:bx], cl
-pop bx
-mov dx, 001
-call memcrawl
-cmp cl, 0
-jne gaga
-pusha
-
-pusha
-mov al, [newchar]
-call puthexb
-mov al, `\r`
-call putc
-popa
-
-jmp recv
-
-gaga:
-mov si, mesg_eor
-call puts
-call getc
-gigi:
-
-
-mov si, mesg_nl
-call puts
-
-;mov si, mesg_ok
-;call puts
-
-mov ax, teststas
-mov es, ax
-mov ax, teststao
-mov cx, 0
+	call kbhit				;Check if any key has been pressed
+	cmp al, 0				;
+	je recv_nokey			;
+	call getc				;If so, get the key value
+	cmp al, 'f'				;Check if they key is 'f'
+	jne recv_nokey			;If not, assume no key was pressed
+	jmp recv_end			;If 'f' has been pressed quit reception loop
+	recv_nokey:				;We land here if user doesn't do anything
+	call comckin			;Check COM buffer
+	cmp al, 0				;If empty - loop
+	je recv					;
+	call comrecv			;Else, get the character
+	mov [combyte], 	al		;Store character in memory
+	popa					;Restore configuration for memcrawl from stack
+	mov cl, [combyte]		;Restore byte received from COM
+	push bx					;Store bx
+	mov bx, ax				;Move current offset into bx
+	mov [es:bx], cl			;Write received byte into memory
+	pop bx					;Restore bx
+	mov dx, 001				;Move 1 byte forward
+	call memcrawl			;Perform memcrawl on pointers
+	pusha					;Store pointers
+	cmp cl, 0				;Check memcrawl exit code
+	jne recv_end			;If we reached the end - exit reception loop
+	push ax					;Store ax
+	test ax, 0x0001			;Check youngest bit of current memory offset
+	jz recv_indicate_h		;Display horizontal indicator
+	mov al, '|'				;Display vertical indicator
+	call putc				;
+	jmp recv_indicate_cr	;Go straight to the CR part
+	recv_indicate_h:		;Display horizontal indicator
+	mov al, '-'				;
+	call putc				;
+	recv_indicate_cr:		;Carriage return
+	mov al, `\r`			;
+	call putc				;
+	pop ax					;Restore ax
+	jmp recv				;Loop
+	recv_end:				;Exit point
+	mov si, mesg_recv_end	;Display message
+	call puts				;
+	call getc				;Wait for keypress
 
 
-wloop:
-	push ax
-	push es
+mov ax, teststas			;Restore memcrawl settings
+mov es, ax					;
+mov ax, teststao			;
+mov cx, 0					;
+diskflush:					;Flush received data to floppy disk
+	push ax					;Store ax
+	push es					;Store segment register
+	mov ax, teststas		;Write data from the begining of the memory to the disk
+	mov es, ax				;
+	mov bx, teststao		;
+	mov ax, [seccnt]		;Written sector number depends on value stored in memory
+	mov dl, [boot_drive]	;Get boot drive number
+	mov dh, 1				;Write only 1 sector
+	call diskwlba			;Write data to disk
+	inc ax					;Increment sector counter
+	mov [seccnt], ax		;
+	call puthexw			;Display current sector number
+	mov al, `\r`			;Print carraige return
+	call putc				;
+	pop es					;Restore segment register
+	pop ax					;Restore ax
 
-	mov ax, teststas
-	mov es, ax
-	mov bx, teststao
+	mov dx, 512				;Perform 512b memory crawl
+	mov bx, testends		;Load memcrawl limits
+	mov fs, bx				;
+	mov bx, testendo		;
+	call memcrawl			;Memcrawl, yay!
+	cmp cl, 0				;Check if we've reached the limit
+	jne diskflush_end		;If so, quit the loop
 
-	mov ax, [seccnt]
-	mov dl, [boot_drive]
-	mov dh, 1
-	call diskwlba
-	inc ax
-	mov [seccnt], ax
-	call puthexw
-	push ax
-	mov al, `\r`
-	call putc
-	pop ax
-	pop es
-	pop ax
+	pusha					;Store all registers
+	push ds					;Store segment registers
+	push es					;
+	mov bx, es				;Indirectly move es into ds
+	mov ds, bx				;
+	mov si, ax				;
+	mov bx, teststas		;Move start segment into es
+	mov es, bx				;
+	mov di, teststao		;And start offset into di
+	mov cx, 512				;Perform 512 memcopy from crawling address to the begining address
+	call memcpy				;
+	pop es					;Restore segment registers
+	pop ds					;
+	popa					;Restore the rest
+	jmp diskflush			;Loop
+	diskflush_end:
+	mov si, mesg_diskflush_end
+	call puts
 
-	mov dx, 512
-	mov bx, testends
-	mov fs, bx
-	mov bx, testendo
-	call memcrawl
-	cmp cl, 0
-	je contwloop
-	jmp wloop_end
-	contwloop:
-
-	pusha
-	push ds
-	push es
-
-	mov bx, es
-	mov ds, bx
-	mov si, ax
-
-	mov bx, teststas
-	mov es, bx
-	mov di, teststao
-	mov cx, 512
-
-	call memcpy
-	pop es
-	pop ds
-	popa
-
-	jmp wloop
-
-
-wloop_end:
-mov si, mesg_ok
-call puts
-
-teststas equ 0x0000
-testends equ teststas+(1024*100/16)
-teststao equ 0x0b00
-testendo equ teststao
+call getc				;Wait for keypress
+jmp 0xFFFF:0			;Reboot
 
 jmp $
 
 seccnt: dw 0
 
-temp: db 0
+combyte: db 0
 
 newchar: db 0
 boot_drive: db 0
 
 ;Messages collection
 mesg_greeting:
-	db "---comboot v0.3 testing", 10, 13
+	db "---comboot v0.4 `functional disaster`", 10, 13
 	db 0
 
 mesg_mem:
@@ -197,6 +175,8 @@ mesg_newfloppy:
 
 mesg_recv:
 	db "receiving data at 9600 baud, 8 bits data, 1 bit stop...", 10, 13
+	db "data flow is shown by indicator below...", 10, 13
+	db "please press 'f' key when all data has been received...", 10, 13
 	db 0
 
 mesg_ok:
@@ -207,8 +187,14 @@ mesg_loop:
 	db "loop...", 10, 13
 	db 0
 
-mesg_eor:
-	db "end of read. press any key", 10, 13
+mesg_recv_end:
+	db "done receiving the data...", 10, 13
+	db "press any key to flush it to the disk...", 10, 13
+	db 0
+
+mesg_diskflush_end:
+	db "done writing disk...", 10, 13
+	db "press any key to reboot...", 10, 13
 	db 0
 
 mesg_nl: db 10, 13, 0
