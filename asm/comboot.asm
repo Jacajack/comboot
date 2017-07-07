@@ -15,7 +15,7 @@ call puts
 mov si, mesg_mem
 call puts
 int 0x12
-call puthexw
+call putdec
 mov si, mesg_mem2
 call puts
 
@@ -45,11 +45,11 @@ call recv
 mov si, mesg_recv_amount1
 call puts
 mov ax, [recv_sectors]
-call puthexw
+call putdec
 mov si, mesg_recv_amount2
 call puts
 mov ax, [recv_bytes]
-call puthexw
+call putdec
 mov si, mesg_recv_amount3
 call puts
 
@@ -225,7 +225,7 @@ mesg_mem:
 	db "available memory: "
 	db 0
 mesg_mem2:
-	db "h KB", 10, 13
+	db "KB", 10, 13
 	db 0
 
 mesg_newfloppy:
