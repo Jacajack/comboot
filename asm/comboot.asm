@@ -36,29 +36,45 @@ call comclibuf
 ;Receiving begins
 mov si, mesg_recv
 call puts
-
-;Settings for memcrawl
-teststas equ 0x0000
-testends equ teststas+(1024*100/16)
-teststao equ 0x2700
-testendo equ teststao
-
+mov word [recv_start_seg], 0x0000
+mov word [recv_start_off], 0x2700
+mov word [recv_end_seg], 1024*628/16
+mov word [recv_end_off], 0x2700
 call recv
 
+mov si, mesg_recv_amount1
+call puts
+mov ax, [recv_sectors]
+call puthexw
+mov si, mesg_recv_amount2
+call puts
+mov ax, [recv_bytes]
+call puthexw
+mov si, mesg_recv_amount3
+call puts
+
+mov si, mesg_recv_end
+call puts
+call getc
+
+;Flushing data to the disk
 mov ax, [recv_sectors]
 inc ax
 mov word [diskflush_seccnt], 0
 mov word [diskflush_seclim], ax
-mov word [diskflush_start_seg], teststas
-mov word [diskflush_start_off], teststao
-mov word [diskflush_end_seg], testends
-mov word [diskflush_end_off], testendo
+mov word [diskflush_start_seg], 0x0000
+mov word [diskflush_start_off], 0x2700
+mov word [diskflush_end_seg], 1024*628/16
+mov word [diskflush_end_off], 0x2700
 call diskflush
 mov si, mesg_diskflush_end
 call puts
-mov si, mesg_rebootkey
-call puts
+
+mov si, mesg_rebootkey	;Message - press any key
+call puts				;
 call getc				;Wait for keypress
+mov si, mesg_reboot		;Reboot message
+call puts				;
 jmp 0xFFFF:0			;Reboot
 
 jmp $
@@ -69,12 +85,12 @@ recv:
 	pusha
 	mov word [recv_bytes], 0	;Reset sector and byt counters
 	mov word [recv_sectors], 0	;
-	mov ax, teststas			;Memcrawl settings
+	mov ax, [recv_start_seg]	;Memcrawl settings
 	mov es, ax					;
-	mov ax, teststao			;
-	mov bx, testends			;
+	mov ax, [recv_start_off]	;
+	mov bx, [recv_end_seg]		;
 	mov fs, bx					;
-	mov bx, testendo			;
+	mov bx, [recv_end_off]		;
 	pusha						;Store them on stack
 	recv_loop:
 	call kbhit					;Check if any key has been pressed
@@ -122,9 +138,6 @@ recv:
 	pop ax						;Restore ax
 	jmp recv_loop				;Loop
 	recv_end:					;Exit point
-	mov si, mesg_recv_end		;Display message
-	call puts					;
-	call getc					;Wait for keypress
 	popa						;Take memcrawl settings off the stack
 	popa
 	popf
@@ -132,6 +145,10 @@ recv:
 	recv_b: db 0
 	recv_bytes: dw 0
 	recv_sectors: dw 0
+	recv_start_seg: dw 0
+	recv_start_off: dw 0
+	recv_end_seg: dw 0
+	recv_end_off: dw 0
 
 diskflush:
 	pushf
@@ -201,7 +218,7 @@ boot_drive: db 0
 
 ;Messages collection
 mesg_greeting:
-	db "---comboot v0.5 `a faster disaster`", 10, 13
+	db "---comboot v0.55 `discordia`", 10, 13
 	db 0
 
 mesg_mem:
@@ -213,13 +230,13 @@ mesg_mem2:
 
 mesg_newfloppy:
 	db "please insert new floppy disk and press any key afterwards...", 10, 13
+	db "data will be received at 9600 baud, 8 bits data, 1 bit stop...", 10, 13
 	db 0
 
 mesg_recv:
 	db "clearing input buffer...", 10, 13
-	db "receiving data at 9600 baud, 8 bits data, 1 bit stop...", 10, 13
-	db "data flow is shown by indicator below...", 10, 13
 	db "please press 'f' key when all data has been received...", 10, 13
+	db "data flow is shown by indicator below...", 10, 13
 	db 0
 
 mesg_ok:
@@ -242,6 +259,17 @@ mesg_diskflush_end:
 mesg_rebootkey:
 	db "press any key to reboot...", 10, 13
 	db 0
+
+mesg_reboot:
+	db "rebooting machine...", 10, 13
+	db 0
+
+mesg_recv_amount1:
+	db "got ", 0
+mesg_recv_amount2:
+	db " sectors and ", 0
+mesg_recv_amount3:
+	db " bytes...", 10, 13, 0
 
 mesg_nl: db 10, 13, 0
 
