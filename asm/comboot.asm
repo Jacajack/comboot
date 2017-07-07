@@ -40,7 +40,7 @@ call puts
 ;Settings for memcrawl
 teststas equ 0x0000
 testends equ teststas+(1024*100/16)
-teststao equ 0x0b00
+teststao equ 0x1e700
 testendo equ teststao
 mov ax, teststas
 mov es, ax
@@ -113,6 +113,7 @@ diskflush:					;Flush received data to floppy disk
 	inc ax					;Increment sector counter
 	mov [seccnt], ax		;
 	call puthexw			;Display current sector number
+
 	mov al, `\r`			;Print carraige return
 	call putc				;
 	pop es					;Restore segment register
@@ -159,7 +160,7 @@ boot_drive: db 0
 
 ;Messages collection
 mesg_greeting:
-	db "---comboot v0.4 `functional disaster`", 10, 13
+	db "---comboot v0.45 `a bit more functional disaster`", 10, 13
 	db 0
 
 mesg_mem:
@@ -174,6 +175,7 @@ mesg_newfloppy:
 	db 0
 
 mesg_recv:
+	db "clearing input buffer...", 10, 13
 	db "receiving data at 9600 baud, 8 bits data, 1 bit stop...", 10, 13
 	db "data flow is shown by indicator below...", 10, 13
 	db "please press 'f' key when all data has been received...", 10, 13
@@ -200,6 +202,6 @@ mesg_diskflush_end:
 mesg_nl: db 10, 13, 0
 
 %include "stdio.asm"
-%include "com.asm"
 %include "disk.asm"
+%include "com.asm"
 %include "mem.asm"
