@@ -107,7 +107,7 @@ recv:
 	call comrecv				;Else, get the character
 	mov [recv_b], al			;Store character in memory
 	inc word [recv_bytes]		;Increment byt counter
-	cmp word [recv_bytes], 511	;On overflow, increment sector counter
+	cmp word [recv_bytes], 512	;On overflow, increment sector counter
 	jne recv_memw				;Continue loop
 	mov word [recv_bytes], 0	;Reset byt counter
 	inc word [recv_sectors]		;Increment sector counter
